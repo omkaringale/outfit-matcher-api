@@ -7,6 +7,7 @@ import uvicorn
 import ast
 import os
 import requests
+import gdown
 
 app = FastAPI()
 
@@ -16,17 +17,11 @@ DRIVE_FILE_ID = "1Zi4fVw24OWd9Wg5g1hAwwHRRT8pk_KfI"  # <- Replace this with actu
 
 # Step 2: Download the file from Google Drive if not already present
 def download_from_gdrive(file_id, dest_path):
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(dest_path, "wb") as f:
-            f.write(response.content)
-        print(f"Downloaded {dest_path} from Google Drive.")
-    else:
-        raise Exception(f"Failed to download file. Status code: {response.status_code}")
-
+    url = f"https://drive.google.com/uc?id={file_id}"
+    gdown.download(url, dest_path, quiet=False)
+    
 if not os.path.exists(CSV_PATH):
-    print("Downloading embeddings from Google Drive...")
+    print("Downloading embeddings from Google Drive using gdown...")
     download_from_gdrive(DRIVE_FILE_ID, CSV_PATH)
     
 df = pd.read_csv(
