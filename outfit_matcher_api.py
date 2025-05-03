@@ -53,6 +53,10 @@ def suggest_outfit(req: OutfitRequest):
 
     return matched[['id', 'productDisplayName', 'similarity']].to_dict(orient="records")
 
+@app.get("/")
+def read_root():
+    return {"message": "Outfit Matcher API is live"}
+
 # Run locally if needed
 # if __name__ == "__main__":
 #     uvicorn.run("outfit_matcher_api:app", host="127.0.0.1", port=8000, reload=True)
