@@ -47,6 +47,9 @@ else:
     df['embedding_vector'] = df[embedding_cols].values.tolist()
 
 # Filter categories
+df.columns = df.columns.str.strip()  # Clean up
+if 'subCategory' not in df.columns:
+    raise Exception(f"Available columns: {df.columns.tolist()}")
 tops = df[df['subCategory'].str.lower() == 'topwear'].reset_index(drop=True)
 bottoms = df[df['subCategory'].str.lower() == 'bottomwear'].reset_index(drop=True)
 
