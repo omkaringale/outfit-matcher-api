@@ -11,7 +11,7 @@ app = FastAPI()
 
 # Paths
 PKL_PATH = "clean_clip_embeddings.pkl"
-GOOGLE_DRIVE_FILE_ID = "13UFKICfKjony83D8lqR_TSs6eWj20VxY"  # Replace this with the actual file ID of the .pkl.gz
+GOOGLE_DRIVE_FILE_ID = "1MVuSmwV6G9GMKfjL0h_2hcAhSIwhvHK5"  # Replace this with the actual file ID of the .pkl.gz
 
 # Download the pickle file using gdown
 def download_from_gdrive(file_id, dest_path):
