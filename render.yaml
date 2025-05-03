@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: outfit-matcher-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./start.sh
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    autoDeploy: false
