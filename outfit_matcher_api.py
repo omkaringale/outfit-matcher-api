@@ -40,16 +40,38 @@ def suggest_outfit(req: OutfitRequest):
     top_id = req.top_id
     top_n = req.top_n
 
+    # Ensure valid ID
     if top_id not in tops['id'].values:
         raise HTTPException(status_code=404, detail=f"Topwear ID {top_id} not found")
 
-    top_vec = np.array(tops[tops['id'] == top_id].iloc[0]['embedding_vector']).reshape(1, -1)
-    bottom_vecs = np.stack(bottoms['embedding_vector'].to_numpy())
+    # Extract topwear vector
+    top_row = tops[tops['id'] == top_id].iloc[0]
+    top_vec = np.array(top_row['embedding_vector']).reshape(1, -1)
+
+    # Optional: filter bottoms by baseColour
+    color = top_row['baseColour']
+    filtered_bottoms = bottoms[bottoms['baseColour'] == color]
+
+    # Fallback if no bottoms of same color found
+    if filtered_bottoms.empty:
+        filtered_bottoms = bottoms.copy()
+
+    # Compute cosine similarity
+    bottom_vecs = np.stack(filtered_bottoms['embedding_vector'].to_numpy())
     similarities = cosine_similarity(top_vec, bottom_vecs)[0]
 
-    bottom_df = bottoms.copy()
-    bottom_df['similarity'] = similarities
-    matched = bottom_df.sort_values(by='similarity', ascending=False).head(top_n)
+    # Attach similarities and sample randomly from top 10
+    filtered_bottoms = filtered_bottoms.copy()
+    filtered_bottoms['similarity'] = similarities
+    top_matches = filtered_bottoms.sort_values(by='similarity', ascending=False).head(10)
+
+    if len(top_matches) < top_n:
+        matched = top_matches
+    else:
+        matched = top_matches.sample(n=top_n)
+
+    # Optional: Log for debugging
+    print("Top 10 similarities (id, score):", list(zip(top_matches['id'], top_matches['similarity'])))
 
     return matched[['id', 'productDisplayName', 'similarity']].to_dict(orient="records")
 
