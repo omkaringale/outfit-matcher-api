@@ -29,7 +29,15 @@ if not os.path.exists(CSV_PATH):
     print("Downloading embeddings from Google Drive...")
     download_from_gdrive(DRIVE_FILE_ID, CSV_PATH)
     
-df = pd.read_csv(CSV_PATH, low_memory=False)
+df = pd.read_csv(
+    CSV_PATH,
+    low_memory=False,
+    on_bad_lines='warn',     # Warn instead of crashing
+    quotechar='"',
+    escapechar='\\',
+    sep=',',
+    engine='python'          # More forgiving than 'c' engine
+)
 
 # Convert the stringified vectors to actual lists if needed
 if 'embedding_vector' in df.columns:
