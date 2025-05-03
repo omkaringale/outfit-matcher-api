@@ -31,12 +31,11 @@ if not os.path.exists(CSV_PATH):
     
 df = pd.read_csv(
     CSV_PATH,
-    low_memory=False,
-    on_bad_lines='warn',     # Warn instead of crashing
+    on_bad_lines='warn',     # Log and skip problematic rows
     quotechar='"',
     escapechar='\\',
     sep=',',
-    engine='python'          # More forgiving than 'c' engine
+    engine='python'
 )
 
 # Convert the stringified vectors to actual lists if needed
