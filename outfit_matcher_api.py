@@ -11,24 +11,47 @@ app = FastAPI()
 
 # Paths
 PKL_PATH = "clean_clip_embeddings.pkl"
-GOOGLE_DRIVE_FILE_ID = "1MVuSmwV6G9GMKfjL0h_2hcAhSIwhvHK5"  # Replace this with the actual file ID of the .pkl.gz
+GOOGLE_DRIVE_FILE_ID = "13UFKICfKjony83D8lqR_TSs6eWj20VxY"
 
 # Download the pickle file using gdown
 def download_from_gdrive(file_id, dest_path):
     url = f"https://drive.google.com/uc?id={file_id}"
     gdown.download(url, dest_path, quiet=False)
 
-# Step 1: Download and load pickle
 if not os.path.exists(PKL_PATH):
     print("Downloading compressed pickle file from Google Drive...")
     download_from_gdrive(GOOGLE_DRIVE_FILE_ID, PKL_PATH)
 
-# Step 2: Load DataFrame from compressed pickle
+# Load DataFrame from compressed pickle
 df = pd.read_pickle(PKL_PATH, compression="gzip")
 
-# Step 3: Prepare topwear and bottomwear subsets
+# Preprocess
+def infer_style(row):
+    name = row['productDisplayName'].lower()
+    if "shirt" in name or "formal" in name:
+        return "formal"
+    elif "jeans" in name or "t-shirt" in name:
+        return "casual"
+    elif "kurta" in name or "ethnic" in name:
+        return "ethnic"
+    elif "jacket" in name:
+        return "layered"
+    else:
+        return "general"
+
+df['style_tag'] = df.apply(infer_style, axis=1)
+
+# Split tops and bottoms
 tops = df[df['subCategory'].str.lower() == 'topwear'].reset_index(drop=True)
 bottoms = df[df['subCategory'].str.lower() == 'bottomwear'].reset_index(drop=True)
+
+STYLE_COMPATIBILITY = {
+    "formal": ["formal", "general"],
+    "casual": ["casual", "general"],
+    "ethnic": ["ethnic", "general"],
+    "layered": ["casual", "formal", "general"],
+    "general": ["formal", "casual", "ethnic", "layered", "general"]
+}
 
 # Request schema
 class OutfitRequest(BaseModel):
@@ -37,48 +60,30 @@ class OutfitRequest(BaseModel):
 
 @app.post("/suggest")
 def suggest_outfit(req: OutfitRequest):
-    top_id = req.top_id
-    top_n = req.top_n
+    if req.top_id not in tops['id'].values:
+        raise HTTPException(status_code=404, detail=f"Topwear ID {req.top_id} not found")
 
-    # Ensure valid ID
-    if top_id not in tops['id'].values:
-        raise HTTPException(status_code=404, detail=f"Topwear ID {top_id} not found")
-
-    # Extract topwear vector
-    top_row = tops[tops['id'] == top_id].iloc[0]
+    top_row = tops[tops['id'] == req.top_id].iloc[0]
     top_vec = np.array(top_row['embedding_vector']).reshape(1, -1)
+    top_style = top_row['style_tag']
 
-    # Optional: filter bottoms by baseColour
-    color = top_row['baseColour']
-    filtered_bottoms = bottoms[bottoms['baseColour'] == color]
-
-    # Fallback if no bottoms of same color found
-    if filtered_bottoms.empty:
-        filtered_bottoms = bottoms.copy()
-
-    # Compute cosine similarity
-    bottom_vecs = np.stack(filtered_bottoms['embedding_vector'].to_numpy())
+    bottom_vecs = np.stack(bottoms['embedding_vector'].to_numpy())
     similarities = cosine_similarity(top_vec, bottom_vecs)[0]
 
-    # Attach similarities and sample randomly from top 10
-    filtered_bottoms = filtered_bottoms.copy()
-    filtered_bottoms['similarity'] = similarities
-    top_matches = filtered_bottoms.sort_values(by='similarity', ascending=False).head(10)
+    bottom_df = bottoms.copy()
+    bottom_df['similarity'] = similarities
 
-    if len(top_matches) < top_n:
-        matched = top_matches
-    else:
-        matched = top_matches.sample(n=top_n)
+    compatible_styles = STYLE_COMPATIBILITY.get(top_style, ["general"])
+    filtered = bottom_df[bottom_df['style_tag'].isin(compatible_styles)]
 
-    # Optional: Log for debugging
-    print("Top 10 similarities (id, score):", list(zip(top_matches['id'], top_matches['similarity'])))
+    matched = filtered.sort_values(by='similarity', ascending=False).head(req.top_n)
 
-    return matched[['id', 'productDisplayName', 'similarity']].to_dict(orient="records")
+    return matched[['id', 'productDisplayName', 'baseColour', 'style_tag', 'similarity']].to_dict(orient="records")
 
 @app.get("/")
 def read_root():
     return {"message": "Outfit Matcher API is live"}
 
-# Run locally if needed
+# Uncomment for local testing
 # if __name__ == "__main__":
 #     uvicorn.run("outfit_matcher_api:app", host="127.0.0.1", port=8000, reload=True)
